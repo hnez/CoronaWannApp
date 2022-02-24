@@ -95,9 +95,11 @@ class AliasFactory(object):
 
 class CoronaWann(object):
     def __init__(self, wann_db='wann.db'):
-        self.db = sqlite3.connect(wann_db)
+        self.db = sqlite3.connect(wann_db, isolation_level='DEFERRED')
 
         cur = self.db.cursor()
+        cur.execute('''PRAGMA synchronous = OFF''')
+        cur.execute('''PRAGMA journal_mode = OFF''')
         cur.execute(DB_SCHEMA_ADVERTISEMENTS)
         cur.execute(DB_SCHEMA_EXPOSURE_KEY_FILE)
         cur.execute(DB_SCHEMA_EXPOSURE_KEYS)
