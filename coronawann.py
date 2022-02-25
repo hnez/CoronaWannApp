@@ -103,6 +103,7 @@ def summarize(exposure_db_path):
 
             aem, ts, rssi, duration = exp_db[rpi]
             trl = key.transmission_risk_level
+            dsos = key.days_since_onset_of_symptoms
 
             rtype = [
                 'UNKNOWN', 'CONFIRMED_TEST', 'CONFIRMED_CLINICAL_DIAGNOSIS',
@@ -112,7 +113,7 @@ def summarize(exposure_db_path):
             alias = aliases.get(key_id)
             when = datetime.datetime.fromtimestamp(ts / 1000)
 
-            print(f'{when} (UTC) - Contact with {alias}:')
+            print(f'{when} (maybe UTC?) - Contact with {alias} (Has shown symptoms for {dsos} days):')
             print(f' Signal strength: {rssi}, Duration: {duration}, Risk Level: {trl}, Report Type: {rtype}')
 
 if __name__ == '__main__':
