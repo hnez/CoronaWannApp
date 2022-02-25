@@ -18,6 +18,23 @@ from expb_pb2 import TemporaryExposureKeyExport
 
 URL_API_BASE = 'https://svc90.main.px.t-online.de/version/v1/diagnosis-keys/country/DE/date'
 
+class AliasFactory(object):
+    NAMES = [
+        'Alice', 'Bob', 'Carol', 'Dan', 'Eve',
+        'Faythe', 'Grace', 'Heidi', 'Ivan',
+        'Judy', 'Mallory', 'Michael', 'Niaj',
+        'Olivia', 'Peggy'
+    ]
+
+    def __init__(self):
+        self.ids = dict()
+
+    def get(self, id):
+        if id not in self.ids:
+            self.ids[id] = len(self.ids)
+
+        return self.NAMES[self.ids[id]]
+
 def generate_rpis(tek, interval_start):
     rpik = HKDF(master=tek, key_len=16, salt=None, hashmod=SHA256, context="EN-RPIK".encode("UTF-8"))
     cipher = AES.new(rpik, AES.MODE_ECB)
@@ -35,7 +52,7 @@ def handle_key_chunk(key_chunk):
     print(f'{i}')
 
     return tuple(
-        (rpi, key)
+        (rpi, i, key)
         for key in key_chunk
         for rpi in generate_rpis(key.key_data, key.rolling_start_interval_number)
     )
@@ -64,8 +81,7 @@ def download_diagnosis_keys():
                 yield (i, r)
 
         with Pool(12) as p:
-            for chunk in p.imap_unordered(handle_key_chunk, key_chunks()):
-                yield chunk
+            yield from p.imap_unordered(handle_key_chunk, key_chunks())
 
 def read_exposure_db(exposure_db):
     exp_db = sqlite3.connect(exposure_db)
@@ -77,13 +93,27 @@ def read_exposure_db(exposure_db):
     )
 
 def summarize(exposure_db_path):
+    aliases = AliasFactory()
+
     exp_db = read_exposure_db(exposure_db_path)
     for key_chunk in download_diagnosis_keys():
-        for rpi, key in key_chunk:
+        for rpi, key_id, key in key_chunk:
             if rpi not in exp_db:
                 continue
 
-            print(rpi, key)
+            aem, ts, rssi, duration = exp_db[rpi]
+            trl = key.transmission_risk_level
+
+            rtype = [
+                'UNKNOWN', 'CONFIRMED_TEST', 'CONFIRMED_CLINICAL_DIAGNOSIS',
+                'SELF_REPORT', 'RECURSIVE', 'REVOKED'
+            ][key.report_type]
+
+            alias = aliases.get(key_id)
+            when = datetime.datetime.fromtimestamp(ts / 1000)
+
+            print(f'{when} (UTC) - Contact with {alias}:')
+            print(f' Signal strength: {rssi}, Duration: {duration}, Risk Level: {trl}, Report Type: {rtype}')
 
 if __name__ == '__main__':
     import sys
